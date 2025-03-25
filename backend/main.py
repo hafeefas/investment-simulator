@@ -1,49 +1,38 @@
+from fastapi import FastAPI
+from routes import auth, stocks
 from dotenv import load_dotenv
-import yfinance as yf  # For fetching stock data
-import numpy as np  # For numerical computations
-from sklearn.linear_model import LinearRegression  # For trend prediction
-from textblob import TextBlob  # For sentiment analysis
-from fastapi import FastAPI  # For creating the API
-from pydantic import BaseModel  # For defining request models
-import os
-from firebase_admin import credentials, initialize_app
+from fastapi.responses import JSONResponse
+
 
 # Load environment variables
 load_dotenv()
 app = FastAPI()
 
-# Use environment variables dynamically
-key_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY")  # Path to the JSON key
-api_key = os.getenv("FIREBASE_CREDENTIALS")    # Firebase API key
-# print("Key Path:", os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY"))  # Should print the path
-# print("API Key:", os.getenv("FIREBASE_CREDENTIALS"))     # Should print the API key
-# print("Key Path:", key_path)  # Check if it prints correctly
-# print("API Key:", api_key)
+# Root route
+@app.get("/")
+async def root():
+    return {"message": "Welcome to InvestSim API"}
 
-# Initialize Firebase with the service account key
-cred = credentials.Certificate(key_path)
-initialize_app(cred)
+# Include the routers
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(stocks.router, prefix="/api/stocks", tags=["stocks"])
 
-def get_multiple_stocks_data(stock_symbol):
-    # Fetch stock data using yfinance
+@app.route('/api/protected', methods=['GET'])
+def protected(): #this is a protected route, it's a route that requires a token to access
+    token = request.headers.get('Authorization')
+    if not token:
+        return jsonify({'message': 'Missing token'}), 401
+
     try:
-        stock = yf.Ticker(stock_symbol)
-        data = stock.history(interval="1mo", start="2024-01-01", end="2024-01-31")
-        return data
-    except Exception as e:
-        print(f"Error fetching data for {stock_symbol}: {e}")
-        return None
+        # Verify the token
+        decoded_token = auth.verify_id_token(token)
+        uid = decoded_token['uid']
+        #Now you can use the users UID to grab user data from Firestore
+        # user = firestore.get_user(uid)
+        return JSONResponse({'message': 'You have access!', 'uid': uid}), 200
+    except auth.InvalidIdTokenError:
+        return JSONResponse({'message': 'Invalid token'}), 403
 
-class StockData(BaseModel):
-    stock_symbol: str
-    stock_data: dict
-
-def get_stocks_data(stock_symbols: list[str]):
-    stock_data = {}
-    for symbol in stock_symbols:
-        data = get_multiple_stocks_data(symbol)
-        if not data.empty:
-            stock_data[symbol] = data
-    return stock_data
-
-print(get_stocks_data(["AAPL", "MSFT", "SPX", "^GSPC", "NVDA", "META"]))
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
