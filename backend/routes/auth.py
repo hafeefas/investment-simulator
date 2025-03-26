@@ -2,8 +2,11 @@
 from fastapi import APIRouter, HTTPException, Depends
 # Import Firebase Admin SDK for authentication
 from firebase_admin import auth
+from firebase_admin import firestore
 # Import our custom user models from the models directory
 from models.user import UserCreate, User
+
+from services.firebase_service import get_db, init_firebase
 # Import typing for type hints
 from typing import Dict
 # Import datetime for timestamp creation
@@ -44,14 +47,20 @@ async def signup(user: UserCreate): #user is the input model, it's a UserCreate 
             "created_at": datetime.now()  # Timestamp of account creation
         }
         
-        # TODO: Add Firestore document creation
         # This is where we'll store the user_data in Firestore
+        # db = firestore.client() -> not needed because we already have get_db() in firebase_service.py 
+        db = get_db()
+        print("Database connection successful in signup route!")
+        db.collection("users").document(user_record.uid).set(user_data)
+        #   ^ collection is the name of the collection in the database
+        #   ^ document is the name of the document in the collection which is user_record.uid since it's unique in the firebase auth
+        #   ^ set is the function that we use to create the document
+        #   ^ data is the data that we want to store in the document
         
         # Return success message and user ID
         return {"message": "User created successfully", "uid": user_record.uid}
+    
     except Exception as e:
-        # If anything goes wrong, raise an HTTP exception
-        # with status code 400 (Bad Request)
         raise HTTPException(status_code=400, detail=str(e))
 
 # Define the signin endpoint
@@ -60,11 +69,18 @@ async def signup(user: UserCreate): #user is the input model, it's a UserCreate 
 @router.post("/signin", response_model=Dict)
 async def signin(email: str, password: str):
     try:
-        # TODO: Implement Firebase sign in
+        # Implemented Firebase sign in
         # This will be handled by Firebase Auth on the frontend
         # The frontend will use Firebase SDK to handle the actual authentication
         # and then send the token to our backend for verification
-        
+        user_record = auth.get_user_by_email(email)
+        if not user_record:
+            raise HTTPException(status_code=401, detail="Invalid username credentials")
+
+        # Verify the password
+        if not auth.verify_password(password, user_record.password): 
+            raise HTTPException(status_code=401, detail="Invalid password credentials")
+
         # For now, just return a success message
         return {"message": "Sign in successful"}
     except Exception as e:
@@ -95,9 +111,11 @@ async def login_user(user: UserCreate):
     try:
         # Sign in with Firebase
         user_record = auth.get_user_by_email(user.email)
-        # In a real application, you would verify the password here
-        # and generate a custom token or session
-        
+
+        # Verify the password
+        if not auth.verify_password(user.password, user_record.password):
+            raise HTTPException(status_code=401, detail="Invalid password credentials")
+
         return JSONResponse({
             "message": "Login successful",
             "uid": user_record.uid
