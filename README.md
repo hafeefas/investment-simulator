@@ -2,6 +2,8 @@
 -----
 
 ## 📚 **Overview**
+This project is still under construction
+
 The **Investment Simulator** is a Python-based API that allows users to simulate different investment strategies using real-time stock data, machine learning models, and financial calculations. It enables users to visualize portfolio performance and store their investment data in **Firebase Firestore**.
 
 ---- 
