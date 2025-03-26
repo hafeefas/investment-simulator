@@ -11,6 +11,7 @@ class UserBase(BaseModel):
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
+    initial_balance: float = 500.0  # Default $500 if not provided
 
 class User(BaseModel):
     id: str
