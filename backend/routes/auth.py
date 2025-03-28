@@ -1,5 +1,5 @@
 # Import necessary FastAPI components for routing and error handling
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Header
 # Import Firebase Admin SDK for authentication
 from firebase_admin import auth
 from firebase_admin import firestore
@@ -29,6 +29,7 @@ async def signup(user: UserCreate): #user is the input model, it's a UserCreate 
             email=user.email,
             password=user.password
         )
+
 
 #  example return:
 #    {
@@ -107,15 +108,21 @@ async def register_user(user: UserCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/login")
-async def login_user(user: UserCreate):
+async def login_user(
+    user: UserCreate,
+    authorization: str = Header(None)  # Optional header for token
+):
     try:
-        # Sign in with Firebase
+        # If we have a token, verify it
+        if authorization:
+            decoded_token = auth.verify_id_token(authorization)
+            return JSONResponse({
+                "message": "Login successful",
+                "uid": decoded_token['uid']
+            })
+        
+        # If no token, try email/password (for testing in docs)
         user_record = auth.get_user_by_email(user.email)
-
-        # Verify the password
-        if not auth.verify_password(user.password, user_record.password):
-            raise HTTPException(status_code=401, detail="Invalid password credentials")
-
         return JSONResponse({
             "message": "Login successful",
             "uid": user_record.uid

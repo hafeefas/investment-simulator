@@ -41,4 +41,5 @@ def get_db():
     return firestore.client()
 
 # When this file is imported, initialize Firebase right away
+
 init_firebase()
