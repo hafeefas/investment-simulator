@@ -1,8 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi import FastAPI, Depends, HTTPException, Header, WebSocket
 from routes import auth, stocks
 from dotenv import load_dotenv
 from fastapi.responses import JSONResponse
 from firebase_admin import auth as firebase_auth
+import asyncio
+import yfinance as yf
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -16,6 +19,57 @@ async def root():
 # Include the routers
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(stocks.router, prefix="/api/stocks", tags=["stocks"])
+
+# WebSocket is a protocol that provides full-duplex communication between client and server
+# Unlike HTTP, which is request-response based, WebSocket maintains an open connection
+# This allows us to send real-time updates from server to client without the client having to request it
+# used for REAL TIME DATA and STOCK UPDATES
+
+# Store all active WebSocket connections in a list
+# This helps us manage multiple clients connected at the same time
+active_connections = []
+
+@app.websocket("/ws/stock-updates/{symbol}")
+async def stock_updates(websocket: WebSocket, symbol: str):
+    # Accept the WebSocket connection from the client
+    await websocket.accept()
+    # Add this connection to our list of active connections
+    active_connections.append(websocket)
+    
+    try:
+        # Infinite loop to keep sending updates
+        # This runs continuously until the client disconnects
+        while True:
+            # Get real-time stock data using yfinance
+            # yfinance makes an API call to Yahoo Finance
+            stock = yf.Ticker(symbol)
+            stock_info = stock.info
+            
+            # Send a JSON message to the connected client
+            # websocket.send_json automatically converts Python dict to JSON
+            await websocket.send_json({
+                "symbol": symbol,                                  # Stock symbol (e.g., AAPL)
+                "price": stock_info.get("currentPrice"),          # Current stock price
+                "timestamp": datetime.now().isoformat(),          # When this update was sent
+                "volume": stock_info.get("regularMarketVolume"),  # Trading volume
+                "dayHigh": stock_info.get("dayHigh"),            # Highest price today
+                "dayLow": stock_info.get("dayLow")               # Lowest price today
+            })
+            
+            # Pause for 6 seconds before sending next update
+            # This prevents overwhelming the Yahoo Finance API
+            # and reduces unnecessary updates
+            await asyncio.sleep(6)
+            
+    except Exception as e:
+        # Handle any errors that occur during the WebSocket connection
+        print(f"Error in WebSocket: {str(e)}")
+    finally:
+        # When connection closes (either due to client disconnecting or error):
+        # 1. Remove this connection from our active connections list
+        # 2. Close the WebSocket connection properly
+        active_connections.remove(websocket)
+        await websocket.close()
 
 async def verify_token(authorization: str = Header(...)):
     try:
