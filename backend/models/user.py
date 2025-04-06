@@ -4,14 +4,14 @@ from datetime import datetime
 
 class UserBase(BaseModel):
     email: EmailStr
-    initial_balance: float = 500.0  # Default $500
+    initial_balance: float = 500000.0  # Default $500,000
     name: str = None
     phone_number: str = None
 
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
-    initial_balance: float = 500.0  # Default $500 if not provided
+    initial_balance: float = 500000.0  # Default $500000 if not provided
 
 class User(BaseModel):
     id: str
