@@ -6,6 +6,7 @@ from firebase_admin import auth as firebase_auth
 import asyncio
 import yfinance as yf
 from datetime import datetime
+from routes.auth import verify_token
 
 # Load environment variables
 load_dotenv()
@@ -70,17 +71,6 @@ async def stock_updates(websocket: WebSocket, symbol: str):
         # 2. Close the WebSocket connection properly
         active_connections.remove(websocket)
         await websocket.close()
-
-async def verify_token(authorization: str = Header(...)):
-    try:
-        #firebase verifies the token and returns the decoded data
-        # this will fail is the token is invalid or expired
-        decoded_token = firebase_auth.verify_id_token(authorization)
-
-        # if the token is valid, return the user's UID
-        return decoded_token['uid']
-    except Exception as e:
-        raise HTTPException(status_code=401, detail="Invalid token")
 
     # example of how to use the verify_token function in a protected route
 @app.get("/protected-route")
