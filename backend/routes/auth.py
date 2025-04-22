@@ -1,7 +1,7 @@
 # Import necessary FastAPI components for routing and error handling
 from fastapi import APIRouter, HTTPException, Depends, Header
 # Import Firebase Admin SDK for authentication
-from firebase_admin import auth
+from firebase_admin import auth as firebase_auth
 from firebase_admin import firestore
 # Import our custom user models from the models directory
 from models.user import UserCreate, User
@@ -16,6 +16,19 @@ from fastapi.responses import JSONResponse
 
 # Create a router instance to group all authentication-related endpoints. it's a fastapi component that allows us to group related routes together
 router = APIRouter()
+
+
+async def verify_token(authorization: str = Header(...)):
+    try:
+        #firebase verifies the token and returns the decoded data
+        # this will fail is the token is invalid or expired
+        decoded_token = auth.verify_id_token(authorization)
+
+        # if the token is valid, return the user's UID
+        return decoded_token['uid']
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
 
 # Define the signup endpoint
 # POST /api/auth/signup
