@@ -33,50 +33,35 @@ async def verify_token(authorization: str = Header(...)):
 # Define the signup endpoint
 # POST /api/auth/signup
 # Takes a UserCreate model as input and returns a dictionary
-@router.post("/signup", response_model=Dict) #the dictionary is the response model, the response_model will basically have an output that's a dictionary
-async def signup(user: UserCreate): #user is the input model, it's a UserCreate model
+@router.post("/signup")
+async def signup(user: UserCreate):
     try:
-        # Create a new user in Firebase Authentication
-        # This will generate a unique user ID (uid)
-        user_record = auth.create_user(
+        # Create user with firebase_auth
+        user_record = firebase_auth.create_user(
             email=user.email,
             password=user.password
         )
 
-
-#  example return:
-#    {
-#        "message": "User created successfully",
-#        "uid": user_record.uid
-#    }
+        # Get Firestore database
+        db = get_db()
         
-        # Prepare user data for Firestore
-        # This will be the document structure in the database
+        # Create user document
         user_data = {
-            "id": user_record.uid,  # Unique Firebase Auth ID
-            "email": user.email,     # User's email address
-            "initial_balance": user.initial_balance,  # Starting balance ($500)
-            "portfolio": {},         # Empty portfolio for stocks
-            "transactions": [],      # Empty list for transaction history
-            "created_at": datetime.now()  # Timestamp of account creation
+            "id": user_record.uid,
+            "email": user.email,
+            "initial_balance": user.initial_balance,
+            "portfolio": {},
+            "transactions": []
         }
         
-        # This is where we'll store the user_data in Firestore
-        # db = firestore.client() -> not needed because we already have get_db() in firebase_service.py 
-        db = get_db()
-        print("Database connection successful in signup route!")
+        # Save to Firestore
         db.collection("users").document(user_record.uid).set(user_data)
-        #   ^ collection is the name of the collection in the database
-        #   ^ document is the name of the document in the collection which is user_record.uid since it's unique in the firebase auth
-        #   ^ set is the function that we use to create the document
-        #   ^ data is the data that we want to store in the document
         
-        # Return success message and user ID
         return {"message": "User created successfully", "uid": user_record.uid}
     
     except Exception as e:
+        print(f"Signup error: {str(e)}")  # Debug print
         raise HTTPException(status_code=400, detail=str(e))
-
 # Define the signin endpoint
 # POST /api/auth/signin
 # Takes email and password as input and returns a dictionary

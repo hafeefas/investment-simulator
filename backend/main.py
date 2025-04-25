@@ -7,8 +7,8 @@ import asyncio
 import yfinance as yf
 from datetime import datetime
 from routes.auth import verify_token
+from fastapi.middleware.cors import CORSMiddleware
 
-# Load environment variables
 load_dotenv()
 app = FastAPI()
 
@@ -16,6 +16,14 @@ app = FastAPI()
 @app.get("/")
 async def root():
     return {"message": "Welcome to InvestSim API"}
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5174"],  # frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 # Include the routers
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
